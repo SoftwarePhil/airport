@@ -48,10 +48,12 @@ defmodule Airport.Airport do
     def step(state, run_time) when run_time > 0 do
         IO.puts("\n___Start____")
         fc_line = line(run_time, state.fc_gen, state.fc_line, :first)
-        #c_line = line(run_time, state.fc_gen, state.fc_line, :couch)
+        c_line = line(run_time, state.fc_gen, state.fc_line, :coach)
 
         {fc_terminals, fc_line}  = terminal(run_time, state.fc_terminals, fc_line)
-        new_state = %__MODULE__{state | fc_line: fc_line, fc_terminals: fc_terminals}
+        {c_terminals, c_line, fc_terminals, fc_line}  = terminal_c(run_time, state.c_terminals, c_line, fc_terminals, fc_line)
+       
+        new_state = %__MODULE__{state | fc_line: fc_line, fc_terminals: fc_terminals, c_line: c_line, c_terminals: c_terminals}
         IO.inspect("--------end--------")
         step(new_state, run_time - 1)
     end
@@ -62,12 +64,16 @@ defmodule Airport.Airport do
     end
 
     def line(run_time, gen, line, type) do
-        case gen.(run_time) do
-                true  -> 
+        case {gen.(run_time), type} do
+                {true, :first}  -> 
+                    customer = %Customer{type: type, id: run_time + 1000}
+                    IO.inspect({customer, "has arrived at step", run_time})
+                    [customer | line]
+                {true, :coach}  -> 
                     customer = %Customer{type: type, id: run_time}
                     IO.inspect({customer, "has arrived at step", run_time})
                     [customer | line]
-                false -> line
+                {false, _} -> line
         end
     end
 
@@ -91,6 +97,17 @@ defmodule Airport.Airport do
         {terminals, fc_list}
     end
 
+   def terminal_c(run_time, terminals_c, c_list, terminals_fc, fc_list) do
+        {terminals_c, c_list} = terminal(run_time, terminals_c, c_list)
+        cond do 
+            length(fc_list) == 0 -> 
+                {terminals_fc, c_list} = terminal(run_time, terminals_fc, c_list)
+                {terminals_c, c_list, terminals_fc, fc_list}
+            true -> {terminals_c, c_list, terminals_fc, fc_list}
+        end
+   end
+
+    #if no first class customers are waiting, coach customers can use first class terminals, so try that first!
     def time_passed(every) do
         fn (current_step) -> 
             case rem(current_step, every) do
